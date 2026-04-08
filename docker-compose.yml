@@ -1,0 +1,30 @@
+services:
+  ghcnd:
+    build: .
+    platform: linux/amd64
+    deploy:
+      resources:
+        reservations:
+          memory: 4G
+        limits:
+          memory: 8G
+    environment:
+      - PROJECT_DIR=/opt/app
+      - DATA_DIR=/home/mco-ghcnd/mco-GHCNd-data
+      - CORES=4
+      - START_YEAR=1979
+      - TIMESCALES=15,30,45,60,90,120,180,365,730,wy,ytd
+      - CLIM_PERIODS=rolling:30,full
+      - MIN_CLIM_YEARS=30
+      - MAX_REPORTING_LATENCY=3
+      - MIN_OBS_FRACTION=1
+      - COUNTRY_FILTER=
+      - STATION_IDS=
+      - AWS_BUCKET=
+      - TZ=America/Denver
+    volumes:
+      # Mount repo for live code edits during development
+      - ./R:/opt/app/R
+      - ./pipeline:/opt/app/pipeline
+      # Persistent data directory
+      - ${DATA_DIR:-~/mco-GHCNd-data}:/home/mco-ghcnd/mco-GHCNd-data

@@ -1,0 +1,27 @@
+# Data directories (not tracked in git)
+*-data/
+data/
+
+# R artifacts
+.Rhistory
+.Rdata
+.RData
+.Rproj.user/
+*.Rproj
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfvars
+
+# Docker
+*.log
