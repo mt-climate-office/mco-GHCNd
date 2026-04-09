@@ -5,9 +5,9 @@ services:
     deploy:
       resources:
         reservations:
-          memory: 4G
-        limits:
           memory: 8G
+        limits:
+          memory: 16G
     environment:
       - PROJECT_DIR=/opt/app
       - DATA_DIR=/home/mco-ghcnd/mco-GHCNd-data

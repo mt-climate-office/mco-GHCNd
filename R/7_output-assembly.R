@@ -185,32 +185,33 @@ summary_dt = spi_stations[, .(id, name, lat, lon, elev, state)]
 if (nrow(spi_dt) > 0) {
   spi_merge = copy(spi_dt)
   setnames(spi_merge, "station_id", "id")
-  spi_obs = spi_merge[, .(id, spi_last_obs = last_obs_date)]
-  spi_merge[, last_obs_date := NULL]
+  setnames(spi_merge, "last_obs_date", "spi_last_obs")
   summary_dt = merge(summary_dt, spi_merge, by = "id", all.x = TRUE)
-  summary_dt = merge(summary_dt, spi_obs, by = "id", all.x = TRUE)
 }
 
 if (nrow(spei_dt) > 0) {
   spei_merge = copy(spei_dt)
   setnames(spei_merge, "station_id", "id")
-  spei_merge[, last_obs_date := NULL]
+  setnames(spei_merge, "last_obs_date", "spei_last_obs")
   summary_dt = merge(summary_dt, spei_merge, by = "id", all.x = TRUE)
 }
 
 if (nrow(eddi_dt) > 0) {
   eddi_merge = copy(eddi_dt)
   setnames(eddi_merge, "station_id", "id")
-  eddi_merge[, last_obs_date := NULL]
+  setnames(eddi_merge, "last_obs_date", "eddi_last_obs")
   summary_dt = merge(summary_dt, eddi_merge, by = "id", all.x = TRUE)
 }
 
 if (nrow(precip_dt) > 0) {
   precip_merge = copy(precip_dt)
   setnames(precip_merge, "station_id", "id")
-  precip_merge[, last_obs_date := NULL]
+  setnames(precip_merge, "last_obs_date", "precip_last_obs")
   summary_dt = merge(summary_dt, precip_merge, by = "id", all.x = TRUE)
 }
+
+# Add pipeline run date
+summary_dt[, data_date := as.character(Sys.Date())]
 
 fwrite(summary_dt, file.path(paths$derived_dir, "all_stations.csv"))
 

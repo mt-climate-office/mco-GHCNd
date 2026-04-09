@@ -119,41 +119,47 @@ save_station_rds = function(dt, sid) {
   TRUE
 }
 
-# ---- COLD START: parse all years, build per-station RDS from scratch ---------
+# ---- COLD START: parse all years, append to per-station RDS on disk ----------
+# Processes one year at a time and appends to per-station RDS files on disk
+# to avoid holding all years x all stations in memory.
 
 if (!warm_start) {
-  msg("Parsing all CSV files (cold start)")
-
-  station_data = list()
+  msg("Parsing all CSV files (cold start — streaming to disk)")
 
   for (yr in years_to_parse) {
     dt_wide = parse_year_csv(yr, all_station_ids)
     if (is.null(dt_wide)) next
 
+    # Split by station and append to per-station RDS files
     ids_in_year = unique(dt_wide$id)
     for (sid in ids_in_year) {
       chunk = dt_wide[id == sid]
       chunk[, id := NULL]
-      if (sid %in% names(station_data)) {
-        station_data[[sid]] = rbindlist(list(station_data[[sid]], chunk), fill = TRUE)
-      } else {
-        station_data[[sid]] = chunk
+
+      rds_path = file.path(paths$station_data, sprintf("%s.rds", sid))
+      if (file.exists(rds_path)) {
+        existing = readRDS(rds_path)
+        chunk = rbindlist(list(existing, chunk), fill = TRUE)
+        rm(existing)
       }
+
+      # Save incrementally (unsorted/unfilled — finalized after all years)
+      saveRDS(chunk, rds_path)
     }
 
     rm(dt_wide)
-    if (yr %% 10 == 0) gc(verbose = FALSE)
+    gc(verbose = FALSE)
   }
 
-  msg(sprintf("Saving %d per-station RDS files", length(station_data)))
-
+  # Finalize all station RDS files (sort, dedup, fill date gaps)
+  msg("Finalizing per-station RDS files")
+  all_rds = list.files(paths$station_data, pattern = "\\.rds$", full.names = TRUE)
   saved = 0L
-  for (sid in names(station_data)) {
-    if (save_station_rds(station_data[[sid]], sid)) saved = saved + 1L
+  for (rds_path in all_rds) {
+    sid = sub("\\.rds$", "", basename(rds_path))
+    dt = readRDS(rds_path)
+    if (save_station_rds(dt, sid)) saved = saved + 1L
   }
-
-  rm(station_data)
-  gc(verbose = FALSE)
 
   msg(sprintf("Step 1 complete (cold): %d station RDS files saved", saved))
 
