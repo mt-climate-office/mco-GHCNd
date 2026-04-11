@@ -215,18 +215,79 @@ summary_dt[, data_date := as.character(Sys.Date())]
 
 fwrite(summary_dt, file.path(paths$derived_dir, "all_stations.csv"))
 
-# ---- Generate summary GeoJSON -----------------------------------------------
+# ---- Generate summary GeoJSON (compact) --------------------------------------
+# All data included, but: NA properties dropped per feature, all numerics
+# rounded to 2 decimals, coordinates to 4 decimals, no pretty-printing.
 
 msg("Writing summary GeoJSON")
 
-# Filter to stations with valid coordinates
 geo_dt = summary_dt[!is.na(lat) & !is.na(lon)]
 
 if (nrow(geo_dt) > 0) {
-  geo_sf = st_as_sf(geo_dt, coords = c("lon", "lat"), crs = 4326)
-  st_write(geo_sf, file.path(paths$derived_dir, "all_stations.geojson"),
-           driver = "GeoJSON", delete_dsn = TRUE, quiet = TRUE)
-  msg(sprintf("GeoJSON: %d features", nrow(geo_sf)))
+  # Round all numeric columns to 2 decimal places
+  num_cols = names(geo_dt)[sapply(geo_dt, is.numeric)]
+  coord_cols = c("lat", "lon")
+  metric_cols = setdiff(num_cols, c(coord_cols, "elev"))
+  for (col in metric_cols) {
+    geo_dt[, (col) := round(get(col), 2)]
+  }
+  # Coordinates to 4 decimal places (~11m precision, plenty for stations)
+  for (col in coord_cols) {
+    geo_dt[, (col) := round(get(col), 4)]
+  }
+
+  # Drop columns that are entirely NA (no station has that metric)
+  all_na_cols = names(geo_dt)[sapply(geo_dt, function(x) all(is.na(x)))]
+  if (length(all_na_cols) > 0) {
+    geo_dt[, (all_na_cols) := NULL]
+    msg(sprintf("  Dropped %d all-NA columns", length(all_na_cols)))
+  }
+
+  # Build GeoJSON manually — skip NA properties per feature for compact output
+  prop_cols = setdiff(names(geo_dt), c("lat", "lon"))
+
+  features = vector("list", nrow(geo_dt))
+  for (i in seq_len(nrow(geo_dt))) {
+    row = geo_dt[i]
+    # Build properties list, skipping NAs
+    props = list()
+    for (col in prop_cols) {
+      val = row[[col]]
+      if (!is.na(val)) props[[col]] = val
+    }
+    features[[i]] = list(
+      type = "Feature",
+      geometry = list(
+        type = "Point",
+        coordinates = c(row$lon, row$lat)
+      ),
+      properties = props
+    )
+  }
+
+  geojson = list(
+    type = "FeatureCollection",
+    features = features
+  )
+
+  geojson_path = file.path(paths$derived_dir, "GHCNd_drought_current.geojson")
+  geojson_gz_path = paste0(geojson_path, ".gz")
+
+  # Write uncompressed GeoJSON
+  geojson_str = toJSON(geojson, auto_unbox = TRUE, digits = 4)
+  writeLines(geojson_str, geojson_path)
+  file_mb = round(file.info(geojson_path)$size / 1e6, 1)
+
+  # Write gzipped version for web delivery
+  gz_con = gzfile(geojson_gz_path, "wb")
+  writeLines(geojson_str, gz_con)
+  close(gz_con)
+  gz_mb = round(file.info(geojson_gz_path)$size / 1e6, 1)
+
+  rm(geojson_str)
+
+  msg(sprintf("GeoJSON: %d features, %d property columns, %.1f MB (%.1f MB gzipped)",
+              nrow(geo_dt), length(prop_cols), file_mb, gz_mb))
 } else {
   msg("WARNING: No stations with valid coordinates for GeoJSON")
 }

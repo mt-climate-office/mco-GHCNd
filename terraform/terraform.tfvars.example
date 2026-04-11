@@ -1,0 +1,16 @@
+# ============================================================================
+# terraform.tfvars.example — Copy to terraform.tfvars and fill in your values
+#
+#   cp terraform.tfvars.example terraform.tfvars
+#   # Edit terraform.tfvars with your actual values
+# ============================================================================
+
+aws_region     = "us-east-2"
+aws_profile    = "mco"
+aws_account_id = "202533506375"
+
+# Find these in AWS Console → VPC → Your VPCs
+vpc_id     = "vpc-XXXXXXXXXXXXXXXXX"
+subnet_ids = ["subnet-XXXXXXXXXXXXXXXXX"]
+
+s3_bucket_name = "mco-ghcnd"

@@ -47,6 +47,11 @@ RUN R -q -e 'install.packages(c( \
 # Non-root user
 RUN useradd -m -s /bin/bash mco-ghcnd
 
+# Create data directory (writable by mco-ghcnd)
+# On Fargate, DATA_DIR=/data is set by the task definition
+# Locally, DATA_DIR defaults to /home/mco-ghcnd/mco-GHCNd-data
+RUN mkdir -p /data && chown mco-ghcnd:mco-ghcnd /data
+
 # Copy application code
 WORKDIR /opt/app
 COPY R/ /opt/app/R/

@@ -92,8 +92,6 @@ compute_spi_for_station = function(sid) {
 
     results$station_id = sid
     results$last_obs_date = as.character(ref_date)
-    results$n_total_days = n_total_days
-    results$n_valid_prcp = n_valid_prcp
     results$skip_reason = NA_character_
     if (length(na_reasons) > 0) results$na_details = paste(na_reasons, collapse = "; ")
     return(results)

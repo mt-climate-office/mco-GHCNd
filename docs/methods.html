@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Methods: GHCNd Station Drought Monitoring Pipeline</title>
+<style>
+  /* ── Reset & base ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:    #2171b5;
+    --blue-dk: #1a3a5c;
+    --bg:      #ffffff;
+    --bg-alt:  #f7f8fa;
+    --bg-code: #f3f5f8;
+    --border:  #ccd3dc;
+    --rule:    #999;
+    --text:    #1a1a1a;
+    --muted:   #555;
+    --sidebar-w: 230px;
+    --content-max: 780px;
+  }
+
+  html { scroll-behavior: smooth; font-size: 16px; }
+
+  body {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.72;
+    display: flex;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Sidebar TOC ──────────────────────────────────────────────── */
+  #toc {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--bg-alt);
+    border-right: 1px solid var(--border);
+    padding: 2rem 1.1rem;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+    font-size: 0.78rem;
+  }
+
+  #toc h2 {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 0.85rem;
+    font-weight: 700;
+    font-family: inherit;
+  }
+
+  #toc ol { list-style: decimal; padding-left: 1.1rem; }
+  #toc ul { list-style: none; padding-left: 0.9rem; margin-top: 0.15rem; }
+  #toc li { margin-bottom: 0.15rem; }
+
+  #toc a {
+    color: var(--text);
+    text-decoration: none;
+    line-height: 1.45;
+    display: inline-block;
+    transition: color 0.15s;
+  }
+  #toc a:hover { color: var(--blue); }
+
+  #toc .toc-sub {
+    font-size: 0.73rem;
+    color: var(--muted);
+  }
+  #toc .toc-sub a { color: var(--muted); }
+  #toc .toc-sub a:hover { color: var(--blue); }
+
+  /* ── Main content ─────────────────────────────────────────────── */
+  #content {
+    flex: 1;
+    padding: 2.5rem 3.5rem 4rem;
+    max-width: calc(var(--sidebar-w) + var(--content-max));
+  }
+
+  /* ── Journal-style banner ─────────────────────────────────────── */
+  .journal-banner {
+    font-family: Georgia, serif;
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: var(--blue);
+    letter-spacing: -0.02em;
+    padding-bottom: 0.4rem;
+    border-bottom: 2.5px solid var(--blue);
+    margin-bottom: 1.5rem;
+  }
+
+  /* ── Header ───────────────────────────────────────────────────── */
+  #doc-header {
+    border-bottom: none;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0;
+  }
+
+  #doc-header h1 {
+    font-family: Georgia, serif;
+    font-size: 1.6rem;
+    color: var(--text);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.35rem;
+  }
+
+  #doc-header .subtitle {
+    font-size: 0.95rem;
+    color: var(--muted);
+    font-style: normal;
+    margin-bottom: 0.75rem;
+  }
+
+  #doc-header .meta {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+    font-size: 0.8rem;
+    color: var(--muted);
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  #doc-header .meta span { margin-right: 1.5rem; }
+
+  /* ── Abstract ──────────────────────────────────────────────────── */
+  #abstract {
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 1rem 0;
+    margin-bottom: 1.5rem;
+  }
+
+  #abstract p {
+    font-size: 0.92rem;
+    text-align: justify;
+    text-justify: inter-word;
+  }
+
+  /* ── Section headings ─────────────────────────────────────────── */
+  section > section { margin-left: 0; }
+
+  h2 {
+    font-family: Georgia, serif;
+    font-size: 1.25rem;
+    color: var(--text);
+    font-weight: 700;
+    margin: 2.5rem 0 0.6rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  h3 {
+    font-family: Georgia, serif;
+    font-size: 1.05rem;
+    color: var(--text);
+    font-weight: 700;
+    margin: 1.6rem 0 0.4rem;
+  }
+
+  h4 {
+    font-family: Georgia, serif;
+    font-size: 0.92rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--text);
+    margin: 1.1rem 0 0.25rem;
+  }
+
+  /* ── Body text ────────────────────────────────────────────────── */
+  p {
+    margin-bottom: 0.85rem;
+    text-align: justify;
+    text-justify: inter-word;
+  }
+
+  ul, ol {
+    margin: 0.4rem 0 0.85rem 1.6rem;
+  }
+  li { margin-bottom: 0.2rem; }
+
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  sup a { font-size: 0.8em; color: var(--blue); }
+
+  /* ── Code ─────────────────────────────────────────────────────── */
+  code {
+    font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.82em;
+    background: var(--bg-code);
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    color: #2c3e50;
+  }
+
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.9rem 1.1rem;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    margin: 0.75rem 0 1.1rem;
+    color: #2c3e50;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+
+  /* ── Tables ───────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 0.75rem 0 1.25rem;
+    font-size: 0.88rem;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+    font-size: 0.84rem;
+    border-top: 2px solid var(--text);
+    border-bottom: 2px solid var(--text);
+  }
+
+  th {
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    padding: 0.45rem 0.7rem;
+    font-weight: 700;
+    font-size: 0.82rem;
+    border-bottom: 1px solid var(--text);
+  }
+
+  td {
+    padding: 0.35rem 0.7rem;
+    border-bottom: 1px solid #e0e3e8;
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  /* ── Callout / note boxes ─────────────────────────────────────── */
+  .note {
+    background: #f0f4f8;
+    border-left: 3px solid var(--blue);
+    padding: 0.6rem 1rem;
+    border-radius: 0 3px 3px 0;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+  }
+
+  .note strong { color: var(--blue-dk); }
+
+  /* ── Equation block ───────────────────────────────────────────── */
+  .eq {
+    text-align: center;
+    margin: 1rem 0;
+    font-style: italic;
+    font-size: 1.02rem;
+    padding: 0.5rem 0;
+    background: transparent;
+    border: none;
+    font-family: Georgia, serif;
+    line-height: 2;
+  }
+
+  /* ── References ───────────────────────────────────────────────── */
+  .references ol {
+    margin-left: 1.5rem;
+  }
+
+  .references li {
+    margin-bottom: 0.5rem;
+    font-size: 0.86rem;
+    line-height: 1.5;
+  }
+
+  /* ── Print styles ─────────────────────────────────────────────── */
+  @media print {
+    body { display: block; font-size: 10pt; }
+    #toc { display: none; }
+    #content { padding: 0; max-width: 100%; }
+    h2 { page-break-before: auto; }
+    pre { border: 1px solid #aaa; white-space: pre-wrap; word-break: break-all; }
+    a { color: #000; text-decoration: none; }
+    a[href]::after { content: " [" attr(href) "]"; font-size: 8pt; color: #555; }
+    .note { border: 1px solid #aaa; background: #f5f5f5; }
+    p, #abstract p { text-align: left; }
+  }
+
+  @media (max-width: 800px) {
+    body { display: block; }
+    #toc {
+      position: relative;
+      height: auto;
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    #content { padding: 1.5rem 1rem; }
+    p, #abstract p { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ SIDEBAR TOC ═════════════════════════════ -->
+<nav id="toc" aria-label="Table of contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#abstract">Abstract</a></li>
+    <li>
+      <a href="#data">Data</a>
+      <ul>
+        <li class="toc-sub"><a href="#ghcnd">2.1 GHCNd</a></li>
+        <li class="toc-sub"><a href="#station-filter">2.2 Station Filtering</a></li>
+      </ul>
+    </li>
+    <li><a href="#clim-periods">Reference Periods</a></li>
+    <li>
+      <a href="#pet">PET Estimation</a>
+      <ul>
+        <li class="toc-sub"><a href="#hargreaves">4.1 Hargreaves-Samani</a></li>
+        <li class="toc-sub"><a href="#fao56-ra">4.2 Extraterrestrial Radiation</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#methods">Drought Index Methods</a>
+      <ul>
+        <li class="toc-sub"><a href="#spi">5.1 SPI</a></li>
+        <li class="toc-sub"><a href="#ancillary">5.2 Ancillary Precip</a></li>
+        <li class="toc-sub"><a href="#spei">5.3 SPEI</a></li>
+        <li class="toc-sub"><a href="#eddi">5.4 EDDI</a></li>
+      </ul>
+    </li>
+    <li><a href="#processing">Processing Architecture</a></li>
+    <li><a href="#outputs">Output Products</a></li>
+    <li><a href="#software">Software &amp; Reproducibility</a></li>
+    <li><a href="#references">References</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════════ MAIN CONTENT ════════════════════════════ -->
+<main id="content">
+
+  <!-- ── Journal banner ─────────────────────────────────────────────── -->
+  <div class="journal-banner">Montana Climate Office</div>
+
+  <!-- ── Header ──────────────────────────────────────────────────────── -->
+  <header id="doc-header">
+    <h1>GHCNd Station Drought Monitoring Pipeline: Methods</h1>
+    <p class="subtitle">Zachary H. Hoylman &mdash; Montana Climate Office, University of Montana</p>
+    <div class="meta">
+      <span>Updated: <time id="doc-date">2026-04-11</time></span>
+      <span>Version 1.0</span>
+    </div>
+  </header>
+
+  <!-- ── Abstract ────────────────────────────────────────────────────── -->
+  <section id="abstract">
+    <p>
+      <strong style="font-size: 1rem;">Abstract</strong>&ensp;The Montana Climate Office (MCO) GHCNd
+      Station Drought Monitoring Pipeline is an operational system that computes standardized drought
+      indices on a daily basis from individual weather station observations across the contiguous
+      United States (CONUS). The pipeline ingests daily station data from the Global Historical
+      Climatology Network &ndash; Daily (GHCNd) <sup><a href="#ref1">[1]</a></sup>, a quality-controlled
+      archive of in situ observations from over 100,000 stations worldwide, updated daily by
+      NOAA&rsquo;s National Centers for Environmental Information (NCEI).
+    </p>
+
+    <p>
+      From the core GHCNd variables &mdash; precipitation (PRCP), maximum temperature (TMAX), and
+      minimum temperature (TMIN) &mdash; the pipeline derives three standardized drought index families:
+      the Standardized Precipitation Index (SPI), the Standardized Precipitation-Evapotranspiration
+      Index (SPEI), and the Evaporative Demand Drought Index (EDDI). Reference evapotranspiration
+      (ET<sub>0</sub>) is estimated using the Hargreaves-Samani method
+      <sup><a href="#ref2">[2]</a></sup> with extraterrestrial radiation computed from FAO-56
+      equations <sup><a href="#ref3">[3]</a></sup>. Ancillary products include precipitation
+      accumulations (mm), percent of normal, departure from normal, and empirical percentile ranks.
+      Each metric is computed across multiple aggregation timescales ranging from 15 to 730 days,
+      as well as water-year and year-to-date accumulations.
+    </p>
+
+    <p>
+      Unlike the companion MCO CONUS Drought Monitoring Pipeline, which operates on the ~4&nbsp;km
+      gridMET dataset, this pipeline produces point-based station estimates. Station-level drought
+      indices offer several advantages: they reflect actual observed conditions rather than
+      interpolated surfaces, they are available globally (not limited to CONUS gridded products),
+      and they provide independent validation points for gridded analyses. Only stations that
+      are currently reporting and have at least 30 years of historical data are included,
+      ensuring robust climatological fitting for operational drought assessment.
+    </p>
+  </section>
+
+  <!-- ── Section 2: Data ─────────────────────────────────────────────── -->
+  <section id="data">
+    <h2>2. Data</h2>
+
+    <section id="ghcnd">
+      <h3>2.1 GHCNd Station Data</h3>
+
+      <p>
+        All meteorological inputs are obtained from the Global Historical Climatology Network &ndash;
+        Daily (GHCNd) <sup><a href="#ref1">[1]</a></sup>, an integrated database of daily climate
+        summaries from land surface stations maintained by NOAA NCEI. GHCNd is subject to a
+        suite of automated quality assurance procedures including duplicate checks, climatological
+        outlier detection, spatial consistency tests, and temporal gap checks
+        <sup><a href="#ref4">[4]</a></sup>. Observations that fail any quality check are flagged
+        and excluded from this pipeline.
+      </p>
+
+      <p>The following GHCNd elements are used:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>GHCNd element</th>
+              <th>Native units</th>
+              <th>Converted units</th>
+              <th>Used for</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Precipitation</td><td><code>PRCP</code></td><td>tenths of mm</td><td>mm</td><td>SPI, SPEI water balance, precip accumulations</td></tr>
+            <tr><td>Max temperature</td><td><code>TMAX</code></td><td>tenths of &deg;C</td><td>&deg;C</td><td>Hargreaves-Samani ET<sub>0</sub></td></tr>
+            <tr><td>Min temperature</td><td><code>TMIN</code></td><td>tenths of &deg;C</td><td>&deg;C</td><td>Hargreaves-Samani ET<sub>0</sub></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Data Access</h4>
+      <p>
+        GHCNd data are obtained from the NCEI public archive as by-year CSV files
+        (<code>YYYY.csv.gz</code>) from
+        <a href="https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_year/" target="_blank">
+        ncei.noaa.gov/pub/data/ghcn/daily/by_year/</a>. Each file contains all station
+        observations for a single calendar year (~170&nbsp;MB compressed for recent years).
+        The pipeline downloads the full historical archive on first run (cold start) and
+        subsequently re-downloads only the current year file on each operational run (warm start),
+        since historical years are immutable.
+      </p>
+
+      <h4>Quality Control</h4>
+      <p>
+        Each GHCNd observation carries a quality flag (<code>QFLAG</code>) from NCEI&rsquo;s
+        automated QC suite. Any observation with a non-blank quality flag is excluded prior to
+        analysis. This removes values that failed duplicate checks, climatological range tests,
+        spatial consistency checks, or other QC procedures described in
+        Durre et al. (2010) <sup><a href="#ref4">[4]</a></sup>.
+      </p>
+    </section>
+
+    <section id="station-filter">
+      <h3>2.2 Station Selection Criteria</h3>
+
+      <p>
+        The pipeline targets operational drought assessment and therefore restricts analysis
+        to stations that are both currently reporting and have sufficient historical depth
+        for robust climatological fitting. Station eligibility is determined from the
+        <code>ghcnd-inventory.txt</code> metadata file, which records the first and last
+        year of data for each station-element combination.
+      </p>
+
+      <h4>Filtering Criteria</h4>
+      <ul>
+        <li>
+          <strong>CONUS bounding box</strong> &mdash; Only stations with US country prefix
+          and coordinates within 24.5&ndash;49.5&deg;N, 125&ndash;66.5&deg;W are included,
+          excluding Alaska, Hawaii, and US territories.
+        </li>
+        <li>
+          <strong>Recency</strong> &mdash; The station must have reported PRCP within the
+          last calendar year (last year in inventory &ge; current year &minus; 1).
+        </li>
+        <li>
+          <strong>Record length</strong> &mdash; The station must have at least 30 years
+          of PRCP data (last year &minus; first year + 1 &ge; 30).
+        </li>
+        <li>
+          <strong>SPEI/EDDI eligibility</strong> &mdash; Stations additionally require
+          TMAX and TMIN with the same recency and record length thresholds. Approximately
+          75&ndash;80% of PRCP-eligible stations also report temperature.
+        </li>
+        <li>
+          <strong>Reporting latency</strong> &mdash; At computation time, stations whose
+          most recent observation is older than the configured latency threshold (default:
+          3 days) are excluded from drought index computation for that run.
+        </li>
+      </ul>
+
+      <div class="note">
+        <strong>Current station counts (CONUS, April 2026):</strong> Approximately 5,277
+        stations are eligible for SPI (precipitation only), and approximately 4,096 are
+        additionally eligible for SPEI and EDDI (precipitation + temperature).
+      </div>
+    </section>
+  </section>
+
+  <!-- ── Section 3: Reference Periods ──────────────────────────────── -->
+  <section id="clim-periods">
+    <h2>3. Climatological Reference Periods</h2>
+
+    <h4>Scientific Motivation</h4>
+    <p>
+      Standardized drought indices measure anomalies relative to a baseline climatology.
+      The choice of baseline profoundly affects index values: the same precipitation total
+      can indicate moderate drought against a 1950&ndash;1980 baseline but near-normal conditions
+      against a 1991&ndash;2020 WMO normal. As the climate warms, the statistical properties of
+      temperature, PET, and water balance are trending systematically, violating the
+      stationarity assumption embedded in fixed-period normals. Hoylman et al. (2022)
+      <sup><a href="#ref5">[5]</a></sup> demonstrate that non-stationarity in baseline
+      climate substantially alters drought frequency and severity assessments, motivating
+      the use of flexible, contemporary reference periods for operational monitoring.
+    </p>
+
+    <h4>Supported Modes</h4>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Spec syntax</th>
+            <th>Mode</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>rolling:30</code></td>
+            <td>Rolling trailing window</td>
+            <td>Trailing 30-year window ending at the current year; tracks contemporary climatology (default)</td>
+          </tr>
+          <tr>
+            <td><code>fixed:1991:2020</code></td>
+            <td>Fixed interval</td>
+            <td>WMO 1991&ndash;2020 standard normal</td>
+          </tr>
+          <tr>
+            <td><code>full</code></td>
+            <td>Full archive</td>
+            <td>All years from <code>START_YEAR</code> to present; maximizes sample size</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      For each timescale and reference period combination, a vector of one aggregated value per
+      year is assembled by extracting the rolling window sum (or mean) ending on the same
+      calendar month-day as the most recent observation. This vector serves as input to the
+      distribution fitting procedure for SPI, SPEI, and EDDI.
+    </p>
+
+    <div class="note">
+      <strong>Minimum data requirement:</strong> At least 3 valid years must be present
+      in the climatological vector for a distribution fit to proceed. Stations or timescales
+      that do not meet this threshold receive <code>NA</code>. With
+      <code>MIN_OBS_FRACTION=1</code>, any year with a single missing day in the aggregation
+      window is excluded from the fitting sample.
+    </div>
+  </section>
+
+  <!-- ── Section 4: PET Estimation ───────────────────────────────────── -->
+  <section id="pet">
+    <h2>4. Reference Evapotranspiration (ET<sub>0</sub>) Estimation</h2>
+
+    <p>
+      SPEI and EDDI require an estimate of atmospheric evaporative demand. GHCNd provides
+      only temperature data (TMAX, TMIN) &mdash; wind speed, humidity, and solar radiation
+      are not available from the standard GHCNd archive. The Penman-Monteith method is
+      therefore not feasible. The Thornthwaite method was rejected because it operates
+      only at monthly timesteps and performs poorly in arid, semiarid, and high-elevation
+      climates <sup><a href="#ref6">[6]</a></sup>.
+    </p>
+
+    <section id="hargreaves">
+      <h3>4.1 Hargreaves-Samani Method</h3>
+
+      <p>
+        Daily reference evapotranspiration is estimated using the Hargreaves-Samani (HS)
+        equation <sup><a href="#ref2">[2]</a></sup>, which requires only daily maximum and
+        minimum temperature plus extraterrestrial radiation (computed from latitude and
+        day of year):
+      </p>
+
+      <div class="eq">
+        ET<sub>0</sub> = 0.0023 &sdot; R<sub>a</sub> &sdot; (T<sub>mean</sub> + 17.8)
+        &sdot; (T<sub>max</sub> &minus; T<sub>min</sub>)<sup>0.5</sup>
+      </div>
+
+      <p>where:</p>
+      <ul>
+        <li>ET<sub>0</sub> is daily reference evapotranspiration (mm/day)</li>
+        <li>R<sub>a</sub> is extraterrestrial radiation converted to equivalent evaporation (mm/day)</li>
+        <li>T<sub>mean</sub> = (T<sub>max</sub> + T<sub>min</sub>) / 2 (&deg;C)</li>
+        <li>T<sub>max</sub> &minus; T<sub>min</sub> is the diurnal temperature range (&deg;C), clamped &ge; 0</li>
+        <li>ET<sub>0</sub> is clamped &ge; 0 (negative values are not physically meaningful)</li>
+      </ul>
+
+      <p>
+        The HS method has been shown to provide reasonable estimates of ET<sub>0</sub> across
+        a wide range of climates when compared to Penman-Monteith, particularly for drought
+        monitoring applications where relative anomalies matter more than absolute accuracy
+        <sup><a href="#ref7">[7]</a></sup>.
+      </p>
+    </section>
+
+    <section id="fao56-ra">
+      <h3>4.2 Extraterrestrial Radiation (FAO-56)</h3>
+
+      <p>
+        Extraterrestrial radiation (R<sub>a</sub>) is computed from station latitude and
+        day of year using the standard FAO-56 equations
+        <sup><a href="#ref3">[3]</a></sup>:
+      </p>
+
+      <ol>
+        <li>
+          <strong>Solar declination</strong> (Eq. 24):
+          <div class="eq">
+            &delta; = 0.409 &sdot; sin(2&pi;/365 &sdot; J &minus; 1.39)
+          </div>
+          where J is the day of year (1&ndash;366).
+        </li>
+        <li>
+          <strong>Inverse relative Earth-Sun distance</strong> (Eq. 23):
+          <div class="eq">
+            d<sub>r</sub> = 1 + 0.033 &sdot; cos(2&pi;/365 &sdot; J)
+          </div>
+        </li>
+        <li>
+          <strong>Sunset hour angle</strong> (Eq. 25):
+          <div class="eq">
+            &omega;<sub>s</sub> = arccos[ &minus;tan(&phi;) &sdot; tan(&delta;) ]
+          </div>
+          where &phi; is station latitude in radians. For polar conditions where
+          |tan(&phi;) &sdot; tan(&delta;)| &ge; 1, &omega;<sub>s</sub> is set to &pi;
+          (24-hour daylight) or 0 (no daylight).
+        </li>
+        <li>
+          <strong>Extraterrestrial radiation</strong> (Eq. 21):
+          <div class="eq">
+            R<sub>a</sub> = (24 &sdot; 60 / &pi;) &sdot; G<sub>sc</sub> &sdot; d<sub>r</sub>
+            &sdot; [ &omega;<sub>s</sub> sin(&phi;) sin(&delta;) + cos(&phi;) cos(&delta;)
+            sin(&omega;<sub>s</sub>) ]
+          </div>
+          where G<sub>sc</sub> = 0.0820 MJ m<sup>&minus;2</sup> min<sup>&minus;1</sup> is the
+          solar constant.
+        </li>
+        <li>
+          <strong>Conversion to equivalent evaporation</strong> (Eq. 20):
+          <div class="eq">
+            R<sub>a</sub> (mm/day) = 0.408 &sdot; R<sub>a</sub> (MJ m<sup>&minus;2</sup> day<sup>&minus;1</sup>)
+          </div>
+          where 0.408 = 1/&lambda; and &lambda; = 2.45 MJ kg<sup>&minus;1</sup> is the
+          latent heat of vaporization.
+        </li>
+      </ol>
+    </section>
+  </section>
+
+  <!-- ── Section 5: Drought Index Methods ───────────────────────────── -->
+  <section id="methods">
+    <h2>5. Drought Index Methods</h2>
+
+    <p>
+      All indices are computed independently at each station. For a given aggregation window
+      of <em>W</em> days, a rolling sum of the input variable is first computed over the
+      station&rsquo;s daily record. One value per climatological reference year is extracted
+      by anchoring the window on the same calendar month-day as the most recent observation.
+      A probability distribution (or empirical CDF) is then fitted to the resulting
+      climatological sample, and the current (most recent) value is transformed to a
+      standardized anomaly.
+    </p>
+
+    <h4>Aggregation Timescales</h4>
+    <ul>
+      <li>Fixed windows: 15, 30, 45, 60, 90, 120, 180, 365, and 730 days</li>
+      <li>Water-year accumulation (Oct 1 &ndash; current date)</li>
+      <li>Year-to-date accumulation (Jan 1 &ndash; current date)</li>
+    </ul>
+
+    <!-- 5.1 SPI ──────────────────────────────────────────────────────── -->
+    <section id="spi">
+      <h3>5.1 Standardized Precipitation Index (SPI)</h3>
+
+      <h4>Motivation</h4>
+      <p>
+        The SPI <sup><a href="#ref8">[8]</a></sup> expresses precipitation anomalies in units
+        of standard deviations relative to a fitted climatological distribution, making it
+        comparable across locations and timescales with differing precipitation regimes. It
+        requires only precipitation data, making it computable for all stations in the network.
+      </p>
+
+      <h4>Input</h4>
+      <p>Daily precipitation (<code>PRCP</code>), in millimeters. Rolling window sums.</p>
+
+      <h4>Statistical Method</h4>
+      <p>
+        A two-parameter Gamma distribution is fitted to the climatological sample using
+        L-moment / probability-weighted moment (PWM) estimation
+        <sup><a href="#ref9">[9]</a></sup>, as implemented in the R package
+        <code>lmomco</code>:
+      </p>
+
+      <ol>
+        <li>
+          <strong>Zero handling (Stagge et al., 2015)</strong> &mdash; Following
+          Stagge et al. (2015) <sup><a href="#ref10">[10]</a></sup>, zero precipitation
+          values are handled via a mixed distribution approach using the Weibull plotting
+          position:
+          <div class="eq">
+            p<sub>0</sub> = m / (n + 1)
+          </div>
+          <div class="eq">
+            p&#x0304;<sub>0</sub> = (m + 1) / [ 2(n + 1) ]
+          </div>
+          where <em>m</em> is the number of zero values and <em>n</em> is the total sample
+          size. The Gamma distribution is fitted only to positive values:
+          <div class="eq">
+            H(x) = p<sub>0</sub> + (1 &minus; p<sub>0</sub>) &sdot; G(x; &alpha;, &beta;)
+          </div>
+        </li>
+        <li>
+          <strong>PWM estimation</strong> &mdash; Unbiased probability-weighted moments
+          computed from positive values via <code>lmomco::pwm.ub()</code>.
+        </li>
+        <li>
+          <strong>L-moment conversion and parameter estimation</strong> &mdash; PWMs
+          converted to L-moments, then <code>lmomco::pargam()</code> returns Gamma
+          parameters (&alpha;, &beta;).
+        </li>
+        <li>
+          <strong>Normal quantile transform</strong> &mdash;
+          SPI = &Phi;<sup>&minus;1</sup>(<em>p</em>).
+        </li>
+      </ol>
+
+      <div class="eq">
+        SPI = &Phi;<sup>&minus;1</sup>[ F<sub>&Gamma;(&alpha;,&beta;)</sub>( X<sub>W</sub> ) ]
+      </div>
+
+      <h4>Interpretation</h4>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Percentile Range</th>
+              <th>SPI / SPEI Values</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td></td><td>Normal or wet conditions</td><td>x &gt; 30</td><td>x &gt; &minus;0.524</td></tr>
+            <tr><td>D0</td><td>Abnormally Dry</td><td>30 &ge; x &gt; 20</td><td>&minus;0.524 &ge; x &gt; &minus;0.842</td></tr>
+            <tr><td>D1</td><td>Moderate Drought</td><td>20 &ge; x &gt; 10</td><td>&minus;0.842 &ge; x &gt; &minus;1.281</td></tr>
+            <tr><td>D2</td><td>Severe Drought</td><td>10 &ge; x &gt; 5</td><td>&minus;1.281 &ge; x &gt; &minus;1.644</td></tr>
+            <tr><td>D3</td><td>Extreme Drought</td><td>5 &ge; x &gt; 2</td><td>&minus;1.644 &ge; x &gt; &minus;2.054</td></tr>
+            <tr><td>D4</td><td>Exceptional Drought</td><td>x &lt; 2</td><td>x &lt; &minus;2.054</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5.2 Ancillary Precip ───────────────────────────────────────── -->
+    <section id="ancillary">
+      <h3>5.2 Ancillary Precipitation Metrics</h3>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Formula</th>
+              <th>Units</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Percent of Normal (PON)</td>
+              <td>( X<sub>W</sub> / &mu;<sub>clim</sub> ) &times; 100</td>
+              <td>%</td>
+              <td>Current accumulation as percentage of climatological mean</td>
+            </tr>
+            <tr>
+              <td>Departure</td>
+              <td>X<sub>W</sub> &minus; &mu;<sub>clim</sub></td>
+              <td>mm</td>
+              <td>Absolute anomaly relative to climatological mean</td>
+            </tr>
+            <tr>
+              <td>Percentile</td>
+              <td>F&#x0302;<sub>n</sub>( X<sub>W</sub> )</td>
+              <td>0&ndash;1</td>
+              <td>Empirical ECDF rank within climatological sample</td>
+            </tr>
+            <tr>
+              <td>Accumulation</td>
+              <td>X<sub>W</sub></td>
+              <td>mm</td>
+              <td>Raw rolling precipitation sum</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5.3 SPEI ─────────────────────────────────────────────────────── -->
+    <section id="spei">
+      <h3>5.3 Standardized Precipitation-Evapotranspiration Index (SPEI)</h3>
+
+      <h4>Motivation</h4>
+      <p>
+        The SPEI <sup><a href="#ref11">[11]</a></sup> extends SPI by incorporating atmospheric
+        evaporative demand, making it sensitive to warming-driven increases in ET<sub>0</sub>
+        even when precipitation is unchanged. In a warming climate, SPEI captures hydrological
+        drought stress that SPI alone would miss.
+      </p>
+
+      <h4>Input</h4>
+      <p>
+        Daily water balance = precipitation (PRCP) &minus; reference evapotranspiration
+        (ET<sub>0</sub> from Hargreaves-Samani), in mm/day. Negative values indicate moisture
+        deficit. Rolling window sums.
+      </p>
+
+      <h4>Statistical Method</h4>
+      <p>
+        The water balance variable is unbounded below and has heavier distributional tails
+        than precipitation alone. The Generalized Logistic (GLO) distribution is therefore
+        used:
+      </p>
+      <ol>
+        <li>L-moments estimated from the climatological sample via unbiased PWMs.</li>
+        <li><code>lmomco::parglo()</code> fits the three-parameter GLO (&xi;, &alpha;, <em>k</em>).</li>
+        <li>GLO CDF evaluated at current observation &rarr; probability <em>p</em>.</li>
+        <li>SPEI = &Phi;<sup>&minus;1</sup>(<em>p</em>).</li>
+      </ol>
+
+      <div class="eq">
+        SPEI = &Phi;<sup>&minus;1</sup>[ F<sub>GLO(&xi;,&alpha;,k)</sub>( P &minus; ET<sub>0</sub> )<sub>W</sub> ]
+      </div>
+
+      <h4>Interpretation</h4>
+      <p>
+        SPEI values follow the same classification thresholds as SPI. Only stations with
+        both PRCP and temperature data (TMAX + TMIN) can produce SPEI, as Hargreaves-Samani
+        ET<sub>0</sub> is required for the water balance computation.
+      </p>
+    </section>
+
+    <!-- 5.4 EDDI ─────────────────────────────────────────────────────── -->
+    <section id="eddi">
+      <h3>5.4 Evaporative Demand Drought Index (EDDI)</h3>
+
+      <h4>Motivation</h4>
+      <p>
+        EDDI <sup><a href="#ref12">[12]</a></sup> isolates the atmospheric demand component of
+        the hydrological cycle. Because it is derived solely from ET<sub>0</sub> &mdash; without
+        precipitation &mdash; it captures early warning signals of drought stress driven by high
+        temperature and diurnal range before soil moisture depletion has occurred.
+      </p>
+
+      <h4>Input</h4>
+      <p>Hargreaves-Samani ET<sub>0</sub> (mm/day). Rolling window sums (cumulative evaporative demand).</p>
+
+      <h4>Statistical Method</h4>
+      <p>
+        EDDI uses a nonparametric rank-based approach following
+        Hobbins et al. (2016) <sup><a href="#ref12">[12]</a></sup>:
+      </p>
+      <ol>
+        <li>
+          <strong>Rank</strong> &mdash; Observations within the climatological sample are ranked
+          from highest (rank 1) to lowest.
+        </li>
+        <li>
+          <strong>Tukey plotting position</strong> &mdash;
+          <div class="eq">
+            p<sub>i</sub> = (i &minus; 1/3) / (n + 1/3)
+          </div>
+          where <em>i</em> is the rank (1 = maximum ET<sub>0</sub>).
+        </li>
+        <li>
+          <strong>Inverse normal approximation</strong> &mdash; EDDI is derived via the rational
+          approximation of Abramowitz and Stegun (1965)
+          <sup><a href="#ref13">[13]</a></sup>. For <em>p</em> &le; 0.5,
+          <em>W</em> = &radic;(&minus;2 ln(<em>p</em>)); for <em>p</em> &gt; 0.5,
+          <em>p</em> is replaced with 1 &minus; <em>p</em> and the sign is reversed.
+        </li>
+        <li>
+          <strong>Sign convention</strong> &mdash; Positive EDDI = above-normal atmospheric
+          demand (drought). Negative = wet anomaly.
+        </li>
+      </ol>
+
+      <div class="eq">
+        EDDI = &Phi;<sup>&minus;1</sup>[ p<sub>Tukey</sub>( ET<sub>0,W</sub> ) ]
+      </div>
+    </section>
+  </section>
+
+  <!-- ── Section 6: Processing Architecture ──────────────────────────── -->
+  <section id="processing">
+    <h2>6. Processing Architecture</h2>
+
+    <h4>Station-Based Parallelism</h4>
+    <p>
+      Unlike the companion gridded pipeline, which decomposes the CONUS domain into spatial
+      tiles, this pipeline parallelizes across stations. Each station&rsquo;s time series is
+      processed independently via <code>pbmcapply::pbmclapply()</code> (fork-based parallel
+      apply). This is naturally embarrassingly parallel &mdash; stations share no state.
+    </p>
+
+    <h4>Cold Start vs. Warm Start</h4>
+    <p>
+      On first run (cold start), all 48 yearly CSV files are downloaded from NCEI and parsed
+      into per-station RDS files. Each station&rsquo;s RDS contains a complete daily time series
+      with columns for date, PRCP, TMAX, and TMIN. On subsequent operational runs (warm start),
+      only the current year and prior year CSV files are re-downloaded and merged into
+      existing per-station RDS files, reducing I/O by approximately 200&times;.
+    </p>
+
+    <h4>S3 Caching (AWS Fargate)</h4>
+    <p>
+      When deployed on AWS Fargate, all per-station RDS files, raw CSVs, and derived outputs
+      are synced to an S3 bucket at the end of each run. The next Fargate run restores
+      this cache before processing, avoiding a full cold start on ephemeral compute
+      infrastructure. Local development runs bypass S3 sync entirely.
+    </p>
+
+    <h4>Pipeline Steps</h4>
+    <pre><code>Step 0: Filter active CONUS stations from GHCNd inventory
+Step 1: Download/parse GHCNd by-year CSVs → per-station RDS files
+Step 2: Compute Hargreaves-Samani daily ET₀ for SPEI-eligible stations
+Step 3: Compute SPI (all precip stations)
+Step 4: Compute SPEI (stations with PET)
+Step 5: Compute EDDI (stations with PET)
+Step 6: Compute precipitation accumulations + ancillary metrics
+Step 7: Assemble outputs (GeoJSON, CSV, per-station JSON, manifest)</code></pre>
+  </section>
+
+  <!-- ── Section 7: Output Products ───────────────────────────────── -->
+  <section id="outputs">
+    <h2>7. Output Products</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Format</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>GHCNd_drought_current.geojson.gz</code></td>
+            <td>GeoJSON (gzipped)</td>
+            <td>All stations with all drought indices as Feature properties; ~2&nbsp;MB compressed</td>
+          </tr>
+          <tr>
+            <td><code>all_stations.csv</code></td>
+            <td>CSV</td>
+            <td>Wide-format table: one row per station, all metrics as columns</td>
+          </tr>
+          <tr>
+            <td><code>stations/{ID}.json</code></td>
+            <td>JSON</td>
+            <td>Per-station detail files with all indices, accumulations, and metadata</td>
+          </tr>
+          <tr>
+            <td><code>station_catalog.csv</code></td>
+            <td>CSV</td>
+            <td>Station metadata, record dates, and available index flags</td>
+          </tr>
+          <tr>
+            <td><code>manifest.csv</code></td>
+            <td>CSV</td>
+            <td>Per-dataset date manifest for tracking data freshness</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Index Summary</h4>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Index</th>
+            <th>Stations</th>
+            <th>Units / Range</th>
+            <th>Distribution</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>SPI</td><td>All with PRCP (~5,277)</td><td>Dimensionless <em>z</em>-score</td><td>Gamma (L-moments)</td></tr>
+          <tr><td>SPEI</td><td>PRCP + TMAX + TMIN (~4,096)</td><td>Dimensionless <em>z</em>-score</td><td>Generalized Logistic (L-moments)</td></tr>
+          <tr><td>EDDI</td><td>TMAX + TMIN (~4,096)</td><td>Dimensionless <em>z</em>-score</td><td>Nonparametric (Tukey)</td></tr>
+          <tr><td>Precip accumulation</td><td>All with PRCP</td><td>mm</td><td>Raw sum</td></tr>
+          <tr><td>Percent of Normal</td><td>All with PRCP</td><td>%</td><td>Climatological mean</td></tr>
+          <tr><td>Departure</td><td>All with PRCP</td><td>mm</td><td>Climatological mean</td></tr>
+          <tr><td>Percentile</td><td>All with PRCP</td><td>0&ndash;1</td><td>Empirical ECDF</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Section 8: Software ───────────────────────────────────────── -->
+  <section id="software">
+    <h2>8. Software &amp; Reproducibility</h2>
+
+    <h4>Runtime Environment</h4>
+    <p>
+      The pipeline runs inside a Docker container based on <code>rocker/r-ver:4.4.1</code>
+      (R 4.4.1). The container includes the AWS CLI for S3 synchronization and minimal
+      spatial libraries (GDAL/GEOS/PROJ for GeoJSON output via <code>sf</code>).
+    </p>
+
+    <h4>Key R Packages</h4>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Package</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>data.table</code></td><td>Fast CSV parsing and in-memory data manipulation</td></tr>
+          <tr><td><code>lmomco</code></td><td>L-moment parameter estimation; Gamma, GLO distributions</td></tr>
+          <tr><td><code>sf</code></td><td>GeoJSON output generation</td></tr>
+          <tr><td><code>jsonlite</code></td><td>Per-station JSON and compact GeoJSON output</td></tr>
+          <tr><td><code>pbmcapply</code></td><td>Fork-based parallel apply with progress bar</td></tr>
+          <tr><td><code>purrr</code></td><td>Functional programming utilities</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Source Code Structure</h4>
+    <pre><code>mco-GHCNd/
+├── R/
+│   ├── drought-functions.R        # Hargreaves-Samani, SPI, SPEI, EDDI fitting
+│   ├── pipeline-common.R          # Shared infrastructure
+│   ├── 0_ghcnd-station-filter.R   # Station selection
+│   ├── 1_ghcnd-cache.R            # Data download and parsing
+│   ├── 2_compute-pet.R            # Hargreaves-Samani ET₀
+│   ├── 3_metrics-spi.R            # SPI computation
+│   ├── 4_metrics-spei.R           # SPEI computation
+│   ├── 5_metrics-eddi.R           # EDDI computation
+│   ├── 6_metrics-precip-accum.R   # Precipitation accumulations
+│   └── 7_output-assembly.R        # Output generation
+├── pipeline/
+│   ├── run_once.sh                # Orchestration script
+│   └── run_test.sh                # Test runner
+├── Dockerfile
+├── docker-compose.yml
+└── terraform/                     # AWS infrastructure (Fargate, S3, ECR)</code></pre>
+
+    <h4>Deployment</h4>
+    <p>
+      The pipeline is deployed on AWS Fargate via Amazon ECS, triggered nightly at
+      10:00&nbsp;PM Mountain Time by an EventBridge Scheduler rule. Outputs are written
+      to a public S3 bucket with CORS enabled for direct web consumption. Infrastructure
+      is managed via Terraform.
+    </p>
+  </section>
+
+  <!-- ── Section 9: References ─────────────────────────────────────── -->
+  <section id="references">
+    <h2>9. References</h2>
+
+    <div class="references">
+      <ol>
+        <li id="ref1">
+          Menne MJ, Durre I, Vose RS, Gleason BE, Houston TG. An overview of the Global
+          Historical Climatology Network-Daily database. <em>Journal of Atmospheric and
+          Oceanic Technology</em>. 2012;29(7):897&ndash;910.
+          doi:<a href="https://doi.org/10.1175/JTECH-D-11-00103.1" target="_blank">10.1175/JTECH-D-11-00103.1</a>
+        </li>
+        <li id="ref2">
+          Hargreaves GH, Samani ZA. Reference crop evapotranspiration from temperature.
+          <em>Applied Engineering in Agriculture</em>. 1985;1(2):96&ndash;99.
+          doi:<a href="https://doi.org/10.13031/2013.26773" target="_blank">10.13031/2013.26773</a>
+        </li>
+        <li id="ref3">
+          Allen RG, Pereira LS, Raes D, Smith M. Crop evapotranspiration: guidelines for
+          computing crop water requirements. <em>FAO Irrigation and Drainage Paper 56</em>.
+          Rome: Food and Agriculture Organization of the United Nations; 1998.
+        </li>
+        <li id="ref4">
+          Durre I, Menne MJ, Gleason BE, Houston TG, Vose RS. Comprehensive automated
+          quality assurance of daily surface observations. <em>Journal of Applied Meteorology
+          and Climatology</em>. 2010;49(8):1615&ndash;1633.
+          doi:<a href="https://doi.org/10.1175/2010JAMC2375.1" target="_blank">10.1175/2010JAMC2375.1</a>
+        </li>
+        <li id="ref5">
+          Hoylman ZH, Bocinsky RK, Jencso KG. Drought assessment has been outpaced by
+          climate change: empirical arguments for a paradigm shift. <em>Nature
+          Communications</em>. 2022;13:2715.
+          doi:<a href="https://doi.org/10.1038/s41467-022-30316-5" target="_blank">10.1038/s41467-022-30316-5</a>
+        </li>
+        <li id="ref6">
+          Droogers P, Allen RG. Estimating reference evapotranspiration under inaccurate
+          data conditions. <em>Irrigation and Drainage Systems</em>. 2002;16(1):33&ndash;45.
+          doi:<a href="https://doi.org/10.1023/A:1015508322413" target="_blank">10.1023/A:1015508322413</a>
+        </li>
+        <li id="ref7">
+          Begueria S, Vicente-Serrano SM, Angulo-Martinez M. A multiscalar global drought
+          dataset: the SPEIbase. <em>Bulletin of the American Meteorological Society</em>.
+          2010;91(10):1351&ndash;1356.
+          doi:<a href="https://doi.org/10.1175/2010BAMS2988.1" target="_blank">10.1175/2010BAMS2988.1</a>
+        </li>
+        <li id="ref8">
+          McKee TB, Doesken NJ, Kleist J. The relationship of drought frequency and duration
+          to time scales. <em>Proceedings of the 8th Conference on Applied Climatology</em>.
+          1993;17(22):179&ndash;183. American Meteorological Society.
+        </li>
+        <li id="ref9">
+          Hosking JRM. L-moments: analysis and estimation of distributions using linear
+          combinations of order statistics. <em>Journal of the Royal Statistical Society,
+          Series B</em>. 1990;52(1):105&ndash;124.
+          doi:<a href="https://doi.org/10.1111/j.2517-6161.1990.tb01775.x" target="_blank">10.1111/j.2517-6161.1990.tb01775.x</a>
+        </li>
+        <li id="ref10">
+          Stagge JH, Tallaksen LM, Gudmundsson L, Van Loon AF, Stahl K. Candidate
+          distributions for climatological drought indices (SPI and SPEI).
+          <em>International Journal of Climatology</em>. 2015;35(13):4027&ndash;4040.
+          doi:<a href="https://doi.org/10.1002/joc.4267" target="_blank">10.1002/joc.4267</a>
+        </li>
+        <li id="ref11">
+          Begueria S, Vicente-Serrano SM, Reig F, Latorre B. Standardized precipitation
+          evapotranspiration index (SPEI) revisited: parameter fitting, evapotranspiration
+          models, tools, datasets and related applications. <em>International Journal of
+          Climatology</em>. 2014;34(10):3001&ndash;3023.
+          doi:<a href="https://doi.org/10.1002/joc.3887" target="_blank">10.1002/joc.3887</a>
+        </li>
+        <li id="ref12">
+          Hobbins MT, Wood A, McEvoy DJ, Huntington JL, Morton C, Anderson M, Hain C.
+          The Evaporative Demand Drought Index. Part I: Linking drought evolution to
+          variations in evaporative demand. <em>Journal of Hydrometeorology</em>.
+          2016;17(6):1745&ndash;1761.
+          doi:<a href="https://doi.org/10.1175/JHM-D-15-0121.1" target="_blank">10.1175/JHM-D-15-0121.1</a>
+        </li>
+        <li id="ref13">
+          Abramowitz M, Stegun IA, eds. <em>Handbook of Mathematical Functions with
+          Formulas, Graphs, and Mathematical Tables</em>. National Bureau of Standards
+          Applied Mathematics Series 55. Washington, DC: U.S. Government Printing Office;
+          1965.
+        </li>
+      </ol>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
