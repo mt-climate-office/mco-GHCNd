@@ -10,8 +10,9 @@
 # ============================================================================
 
 resource "aws_s3_bucket" "output" {
-  bucket = var.s3_bucket_name
-  tags   = local.common_tags
+  bucket        = var.s3_bucket_name
+  force_destroy = true  # Allow terraform to delete bucket even with objects (for region migration)
+  tags          = local.common_tags
 }
 
 # Allow public reads (for web delivery of GeoJSON, CSV, etc.)

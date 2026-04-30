@@ -14,7 +14,7 @@ services:
       - CORES=4
       - START_YEAR=1979
       - TIMESCALES=15,30,45,60,90,120,180,365,730,wy,ytd
-      - CLIM_PERIODS=rolling:30,full
+      - CLIM_PERIODS=rolling:30,fixed:1991:2020,full
       - MIN_CLIM_YEARS=30
       - MAX_REPORTING_LATENCY=3
       - MIN_OBS_FRACTION=1
