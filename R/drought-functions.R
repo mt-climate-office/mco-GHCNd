@@ -77,55 +77,51 @@ hargreaves_samani_daily = function(tmax, tmin, lat_deg, doy) {
 #   For x = 0: p = p_bar_0
 #   SPI = Phi^-1(p)
 
-gamma_fit_spi = function(x, export_opts = 'SPI', return_latest = TRUE,
+gamma_fit_spi = function(ref_dist, current_val, export_opts = 'SPI',
                          climatology_length = 30, zero_threshold = 0) {
   library(lmomco)
   tryCatch({
-    x = as.numeric(x)
-    x = tail(x, climatology_length)
-    n = length(x)
+    ref_dist = as.numeric(ref_dist)
+    ref_dist = tail(ref_dist, climatology_length)
+    n = length(ref_dist)
     if (n < 3) return(NA)
+    if (is.na(current_val)) return(NA)
 
-    # Identify zeros (threshold per Stagge et al.)
-    is_zero = (x <= zero_threshold)
-    n_zero  = sum(is_zero)
+    # Identify zeros in reference distribution (threshold per Stagge et al.)
+    is_zero_ref = (ref_dist <= zero_threshold)
+    n_zero  = sum(is_zero_ref)
+
+    # Weibull plotting positions (Eq. 2-3)
+    p0      = n_zero / (n + 1)
+    p_bar_0 = (n_zero + 1) / (2 * (n + 1))
 
     if (n_zero == n) {
-      spi = rep(0, n)
-      fit_cdf = rep(0.5, n)
+      # All reference values are zero
+      fit_cdf_current = if (current_val <= zero_threshold) p_bar_0 else 1 - 1/(2*(n+1))
+      spi_current = qnorm(fit_cdf_current)
     } else {
-      x_pos = x[!is_zero]
-      if (length(x_pos) < 3 || stats::sd(x_pos) == 0) return(NA)
+      ref_pos = ref_dist[!is_zero_ref]
+      if (length(ref_pos) < 3 || stats::sd(ref_pos) == 0) return(NA)
 
-      # L-moment gamma fit to non-zero values
-      pwm      = pwm.ub(x_pos)
+      # L-moment gamma fit to non-zero reference values
+      pwm      = pwm.ub(ref_pos)
       lmom     = pwm2lmom(pwm)
       fit.gam  = pargam(lmom)
 
-      # Weibull plotting positions (Eq. 2-3)
-      p0      = n_zero / (n + 1)
-      p_bar_0 = (n_zero + 1) / (2 * (n + 1))
+      # Evaluate CDF at current_val
+      if (current_val <= zero_threshold) {
+        fit_cdf_current = p_bar_0
+      } else {
+        fit_cdf_current = p0 + (1 - p0) * cdfgam(current_val, fit.gam)
+      }
 
-      # Build CDF (Eq. 4)
-      fit_cdf = numeric(n)
-      fit_cdf[is_zero]  = p_bar_0
-      fit_cdf[!is_zero] = p0 + (1 - p0) * cdfgam(x_pos, fit.gam)
-
-      # Transform to standard normal and clamp to [-3, 3]
-      spi = qnorm(fit_cdf)
+      spi_current = qnorm(fit_cdf_current)
     }
 
-    if (return_latest) {
-      if (export_opts == 'CDF')    return(fit_cdf[n])
-      if (export_opts == 'params') return(list(fit = fit.gam,
-                                                p0 = n_zero / (n + 1)))
-      if (export_opts == 'SPI')    return(spi[n])
-    } else {
-      if (export_opts == 'CDF')    return(fit_cdf)
-      if (export_opts == 'params') return(list(fit = fit.gam,
-                                                p0 = n_zero / (n + 1)))
-      if (export_opts == 'SPI')    return(spi)
-    }
+    if (export_opts == 'CDF')    return(fit_cdf_current)
+    if (export_opts == 'params') return(list(fit = if (n_zero == n) NULL else fit.gam,
+                                              p0 = p0))
+    if (export_opts == 'SPI')    return(spi_current)
   }, error = function(cond) return(NA))
 }
 
@@ -134,37 +130,28 @@ gamma_fit_spi = function(x, export_opts = 'SPI', return_latest = TRUE,
 # Generalized Logistic distribution fit for SPEI (water balance = precip - PET).
 # GLO handles the unbounded, potentially negative water balance values.
 
-glo_fit_spei = function(x, export_opts = 'SPEI', return_latest = TRUE,
+glo_fit_spei = function(ref_dist, current_val, export_opts = 'SPEI',
                         climatology_length = 30) {
   library(lmomco)
   tryCatch({
-    x = as.numeric(x)
-    x = tail(x, climatology_length)
-    n = length(x)
-    if (n < 3 || stats::sd(x) == 0) return(NA)
+    ref_dist = as.numeric(ref_dist)
+    ref_dist = tail(ref_dist, climatology_length)
+    n = length(ref_dist)
+    if (n < 3 || stats::sd(ref_dist) == 0) return(NA)
+    if (is.na(current_val)) return(NA)
 
-    # Unbiased Sample Probability-Weighted Moments
-    pwm = pwm.ub(x)
+    # Fit GLO to reference distribution only
+    pwm = pwm.ub(ref_dist)
     lmoments_x = pwm2lmom(pwm)
-
-    # Fit generalized logistic
     fit.parglo = parglo(lmoments_x)
 
-    # Compute CDF
-    fit.cdf = cdfglo(x, fit.parglo)
+    # Evaluate at current_val
+    fit_cdf_current = cdfglo(current_val, fit.parglo)
+    spei_current = qnorm(fit_cdf_current, mean = 0, sd = 1)
 
-    # Transform to standard normal
-    spei = qnorm(fit.cdf, mean = 0, sd = 1)
-
-    if (return_latest) {
-      if (export_opts == 'CDF')    return(fit.cdf[n])
-      if (export_opts == 'params') return(fit.parglo)
-      if (export_opts == 'SPEI')   return(spei[n])
-    } else {
-      if (export_opts == 'CDF')    return(fit.cdf)
-      if (export_opts == 'params') return(fit.parglo)
-      if (export_opts == 'SPEI')   return(spei)
-    }
+    if (export_opts == 'CDF')    return(fit_cdf_current)
+    if (export_opts == 'params') return(fit.parglo)
+    if (export_opts == 'SPEI')   return(spei_current)
   }, error = function(cond) return(NA))
 }
 
@@ -174,7 +161,7 @@ glo_fit_spei = function(x, export_opts = 'SPEI', return_latest = TRUE,
 # Positive EDDI = drought (high evaporative demand).
 # Uses Abramowitz & Stegun rational approximation for the inverse normal.
 
-nonparam_fit_eddi = function(x, climatology_length = 30) {
+nonparam_fit_eddi = function(ref_dist, current_val, climatology_length = 30) {
   C0 = 2.515517
   C1 = 0.802853
   C2 = 0.010328
@@ -182,59 +169,70 @@ nonparam_fit_eddi = function(x, climatology_length = 30) {
   d2 = 0.189269
   d3 = 0.001308
 
-  x = as.numeric(x)
-  x = tail(x, climatology_length)
+  ref_dist = as.numeric(ref_dist)
+  ref_dist = tail(ref_dist, climatology_length)
 
-  if (all(is.na(x))) return(NA)
+  if (all(is.na(ref_dist))) return(NA)
+  if (is.na(current_val)) return(NA)
 
-  # Rank PET (1 = max)
-  rank_1 = rank(-x)
+  # If current_val is the last element of ref_dist (rolling/full case),
+  # preserve original n-sample ranking. Otherwise (fixed-outside-range),
+  # rank current_val within the ref_dist + current_val (n+1) sample.
+  n_ref = length(ref_dist)
+  current_in_ref = (n_ref > 0) && isTRUE(all.equal(ref_dist[n_ref], current_val))
 
-  # Empirical probabilities
-  prob = ((rank_1 - 0.33) / (length(rank_1) + 0.33))
-
-  # Compute W
-  W = numeric(length(prob))
-  for (i in seq_along(prob)) {
-    if (prob[i] <= 0.5) {
-      W[i] = sqrt(-2 * log(prob[i]))
-    } else {
-      W[i] = sqrt(-2 * log(1 - prob[i]))
-    }
+  if (current_in_ref) {
+    sample = ref_dist
+    target_idx = n_ref
+  } else {
+    sample = c(ref_dist, current_val)
+    target_idx = length(sample)
   }
 
-  # Indexes needing sign reversal
-  reverse_index = which(prob > 0.5)
+  # Rank PET (1 = max evaporative demand)
+  rank_1 = rank(-sample)
+  n = length(rank_1)
 
-  # Compute EDDI
+  # Tukey plotting position for current_val
+  prob_current = (rank_1[target_idx] - 0.33) / (n + 0.33)
+
+  # Compute W
+  if (prob_current <= 0.5) {
+    W = sqrt(-2 * log(prob_current))
+  } else {
+    W = sqrt(-2 * log(1 - prob_current))
+  }
+
   EDDI = W - ((C0 + C1 * W + C2 * W^2) / (1 + d1 * W + d2 * W^2 + d3 * W^3))
 
-  # Reverse sign where prob > 0.5
-  EDDI[reverse_index] = -EDDI[reverse_index]
+  # Sign reversal for prob > 0.5 so high demand → positive EDDI
+  if (prob_current > 0.5) EDDI = -EDDI
 
-  return(EDDI[length(EDDI)])
+  return(EDDI)
 }
 
 
 # ---- Simple metrics ----------------------------------------------------------
 
-percent_of_normal = function(x, climatology_length = 30) {
-  x = tail(x, climatology_length)
-  x_mean = mean(x, na.rm = TRUE)
-  if (is.na(x_mean) || x_mean == 0) return(NA_real_)
-  return((x[length(x)] / x_mean) * 100)
+percent_of_normal = function(ref_dist, current_val, climatology_length = 30) {
+  ref_dist = tail(ref_dist, climatology_length)
+  x_mean = mean(ref_dist, na.rm = TRUE)
+  if (is.na(x_mean) || x_mean == 0 || is.na(current_val)) return(NA_real_)
+  return((current_val / x_mean) * 100)
 }
 
-deviation_from_normal = function(x, climatology_length = 30) {
-  x = tail(x, climatology_length)
-  x_mean = mean(x, na.rm = TRUE)
-  return(x[length(x)] - x_mean)
+deviation_from_normal = function(ref_dist, current_val, climatology_length = 30) {
+  ref_dist = tail(ref_dist, climatology_length)
+  x_mean = mean(ref_dist, na.rm = TRUE)
+  if (is.na(current_val)) return(NA_real_)
+  return(current_val - x_mean)
 }
 
-compute_percentile = function(x, climatology_length = 30) {
+compute_percentile = function(ref_dist, current_val, climatology_length = 30) {
   tryCatch({
-    x = tail(x, climatology_length)
-    ecdf_ = ecdf(x)
-    return(ecdf_(x[length(x)]))
+    ref_dist = tail(ref_dist, climatology_length)
+    if (is.na(current_val)) return(NA)
+    ecdf_ = ecdf(ref_dist)
+    return(ecdf_(current_val))
   }, error = function(e) return(NA))
 }

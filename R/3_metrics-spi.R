@@ -64,6 +64,21 @@ compute_spi_for_station = function(sid) {
         label = paste0("spi_", ts$label, "_", cp$label)
 
         prcp_dt = dt[, .(date, value = prcp)]
+
+        # Current observation (independent of clim_years)
+        current_val = compute_current_value(
+          prcp_dt, ref_date, window,
+          agg_fn = sum, min_obs_frac = env$MIN_OBS_FRACTION
+        )
+
+        if (is.na(current_val)) {
+          results[[label]] = NA_real_
+          na_reasons = c(na_reasons, sprintf(
+            "%s: current %dd window has missing data", label, window))
+          next
+        }
+
+        # Reference distribution from clim_years
         clim_vec = extract_clim_vector(
           prcp_dt, ref_date, window, clim_years,
           agg_fn = sum, min_obs_frac = env$MIN_OBS_FRACTION
@@ -81,9 +96,8 @@ compute_spi_for_station = function(sid) {
           next
         }
 
-        spi_val = gamma_fit_spi(clim_vec_clean,
+        spi_val = gamma_fit_spi(clim_vec_clean, current_val,
                                 export_opts = "SPI",
-                                return_latest = TRUE,
                                 climatology_length = length(clim_vec_clean))
 
         results[[label]] = spi_val

@@ -263,6 +263,25 @@ rolling_mean_latest = function(x, window, min_obs_frac = 0.8) {
 #
 # Returns: named numeric vector (names = years) with one value per clim year
 
+# Compute the current period value: rolling window of `window` days ending
+# at `ref_date`. This is independent of the climatological reference period
+# and represents the actual "current" observation to be evaluated against
+# the fitted distribution. Required to fix the fixed-period current-value bug
+# where extract_clim_vector's last element is the last in-range anchor (e.g.
+# 2020 for fixed:1991:2020), not the actual current observation.
+compute_current_value = function(daily_dt, ref_date, window,
+                                  agg_fn = sum, min_obs_frac = 0.8) {
+  start_date = ref_date - window + 1L
+  idx = daily_dt$date >= start_date & daily_dt$date <= ref_date
+  vals = daily_dt$value[idx]
+
+  if (length(vals) < window * 0.5) return(NA_real_)
+  n_valid = sum(!is.na(vals))
+  if (n_valid / window < min_obs_frac) return(NA_real_)
+
+  agg_fn(vals, na.rm = TRUE)
+}
+
 extract_clim_vector = function(daily_dt, ref_date, window, clim_years,
                                 agg_fn = sum, min_obs_frac = 0.8) {
   ref_doy = as.integer(format(ref_date, "%j"))

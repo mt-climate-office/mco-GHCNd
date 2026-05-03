@@ -53,8 +53,17 @@ compute_precip_for_station = function(sid) {
         ts_label = ts$label
         cp_label = cp$label
 
-        # Extract climatology vector (accumulated precip per year)
         prcp_dt = dt[, .(date, value = prcp)]
+
+        # Current observation (independent of clim_years)
+        current_val = compute_current_value(
+          prcp_dt, ref_date, window,
+          agg_fn = sum, min_obs_frac = env$MIN_OBS_FRACTION
+        )
+
+        if (is.na(current_val)) next
+
+        # Reference distribution from clim_years
         clim_vec = extract_clim_vector(
           prcp_dt, ref_date, window, clim_years,
           agg_fn = sum, min_obs_frac = env$MIN_OBS_FRACTION
@@ -63,23 +72,21 @@ compute_precip_for_station = function(sid) {
         clim_vec_clean = clim_vec[!is.na(clim_vec)]
         if (length(clim_vec_clean) < 3) next
 
-        # The latest value (current period)
-        latest = clim_vec_clean[length(clim_vec_clean)]
+        # Raw current accumulation (note: this is NOT the last clim_vec element
+        # for fixed:YYYY:YYYY when current year is outside the range)
+        results[[paste0("precip_mm_", ts_label, "_", cp_label)]] = current_val
 
-        # Raw accumulation
-        results[[paste0("precip_mm_", ts_label, "_", cp_label)]] = latest
-
-        # Percent of normal
         results[[paste0("precip_pon_", ts_label, "_", cp_label)]] =
-          percent_of_normal(clim_vec_clean, climatology_length = length(clim_vec_clean))
+          percent_of_normal(clim_vec_clean, current_val,
+                            climatology_length = length(clim_vec_clean))
 
-        # Deviation from normal
         results[[paste0("precip_dev_", ts_label, "_", cp_label)]] =
-          deviation_from_normal(clim_vec_clean, climatology_length = length(clim_vec_clean))
+          deviation_from_normal(clim_vec_clean, current_val,
+                                climatology_length = length(clim_vec_clean))
 
-        # Percentile
         results[[paste0("precip_pctile_", ts_label, "_", cp_label)]] =
-          compute_percentile(clim_vec_clean, climatology_length = length(clim_vec_clean))
+          compute_percentile(clim_vec_clean, current_val,
+                             climatology_length = length(clim_vec_clean))
       }
     }
 

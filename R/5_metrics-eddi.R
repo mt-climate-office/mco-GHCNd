@@ -61,6 +61,21 @@ compute_eddi_for_station = function(sid) {
         label = paste0("eddi_", ts$label, "_", cp$label)
 
         pet_dt = dt[, .(date, value = pet)]
+
+        # Current PET accumulation (independent of clim_years)
+        current_val = compute_current_value(
+          pet_dt, ref_date, window,
+          agg_fn = sum, min_obs_frac = env$MIN_OBS_FRACTION
+        )
+
+        if (is.na(current_val)) {
+          results[[label]] = NA_real_
+          na_reasons = c(na_reasons, sprintf(
+            "%s: current %dd window has missing PET", label, window))
+          next
+        }
+
+        # Reference distribution from clim_years
         clim_vec = extract_clim_vector(
           pet_dt, ref_date, window, clim_years,
           agg_fn = sum, min_obs_frac = env$MIN_OBS_FRACTION
@@ -77,7 +92,7 @@ compute_eddi_for_station = function(sid) {
           next
         }
 
-        eddi_val = nonparam_fit_eddi(clim_vec_clean,
+        eddi_val = nonparam_fit_eddi(clim_vec_clean, current_val,
                                      climatology_length = length(clim_vec_clean))
 
         results[[label]] = eddi_val
