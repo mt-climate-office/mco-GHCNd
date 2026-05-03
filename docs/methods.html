@@ -690,12 +690,30 @@
 
     <p>
       All indices are computed independently at each station. For a given aggregation window
-      of <em>W</em> days, a rolling sum of the input variable is first computed over the
-      station&rsquo;s daily record. One value per climatological reference year is extracted
-      by anchoring the window on the same calendar month-day as the most recent observation.
-      A probability distribution (or empirical CDF) is then fitted to the resulting
-      climatological sample, and the current (most recent) value is transformed to a
-      standardized anomaly.
+      of <em>W</em> days, the pipeline computes <strong>two distinct quantities</strong>:
+    </p>
+    <ol>
+      <li>
+        The <em>current observation</em>, X<sub>W</sub><sup>(now)</sup> &mdash; the rolling
+        window of <em>W</em> days ending at the most recent valid observation date.
+        This value is independent of the climatological reference period.
+      </li>
+      <li>
+        The <em>reference distribution</em>, {X<sub>W</sub><sup>(y)</sup>} &mdash; one
+        aggregated value per reference year <em>y</em>, anchored on the same calendar
+        month-day as the current observation. The set of years <em>y</em> is determined
+        by <code>CLIM_PERIODS</code>.
+      </li>
+    </ol>
+    <p>
+      A probability distribution (or empirical CDF) is then fitted to the reference distribution,
+      and the current observation is evaluated against that fit to produce a standardized anomaly.
+      For <code>rolling:N</code> and <code>full</code> modes the current year is naturally part
+      of the reference distribution, so the current observation also appears as the last element
+      of the reference set. For <code>fixed:YYYY:YYYY</code> modes where the current year is
+      outside the fixed range, the current observation is external to the reference set and is
+      evaluated against (but not included in) the fitted distribution. Treating the current value
+      and the reference distribution as separate inputs ensures correct behavior in all modes.
     </p>
 
     <h4>Aggregation Timescales</h4>
@@ -916,6 +934,13 @@
           <strong>Descending rank</strong> &mdash; Each accumulated ET<sub>0,W</sub> in the
           climatological sample is assigned a rank <em>i</em> in <strong>descending</strong>
           order, so that <em>i</em>&nbsp;=&nbsp;1 corresponds to the maximum (driest) value.
+          When the current observation is part of the reference set (rolling/full modes),
+          ranking is done over the n-element reference distribution. When the current
+          observation is external to the reference set (fixed-period mode with current year
+          outside the range), the current value is appended to the reference distribution
+          before ranking, producing an (n+1)-element sample. This preserves the original
+          rank-based math for rolling/full modes while correctly placing the external
+          current value in the empirical distribution for fixed-period modes.
         </li>
         <li>
           <strong>Tukey plotting position</strong> &mdash;
