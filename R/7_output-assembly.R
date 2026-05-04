@@ -292,6 +292,162 @@ if (nrow(geo_dt) > 0) {
   msg("WARNING: No stations with valid coordinates for GeoJSON")
 }
 
+# ---- Generate base + per-slice + manifest layout (lazy-load) -----------------
+# This produces a thin base GeoJSON (geometry + minimal metadata) plus one
+# small JSON file per (var, ts, period) slice. Clients load the manifest first,
+# then fetch the base once, then lazy-load only the slices they need to display.
+#
+# Layout under derived/ghcnd_drought/:
+#   stations_base.geojson.gz        - geometry + id/name/state/elev/data_date
+#   slices/<var>_<ts>_<period>.json.gz  - { var, ts, period, generated, values: {id: val} }
+#   manifest.json.gz                - index of all slices
+
+if (nrow(geo_dt) > 0) {
+  msg("Writing lazy-load layout (base + slices + manifest)")
+
+  generated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  slices_dir = file.path(paths$derived_dir, "slices")
+  dir.create(slices_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # Per-station data_date = max obs date across all metric families
+  obs_date_cols = intersect(c("spi_last_obs", "spei_last_obs", "eddi_last_obs", "precip_last_obs"),
+                             names(summary_dt))
+  if (length(obs_date_cols) > 0) {
+    summary_dt[, station_data_date := apply(.SD, 1, function(row) {
+      dates = na.omit(unlist(row))
+      if (length(dates) == 0) return(NA_character_)
+      max(dates)
+    }), .SDcols = obs_date_cols]
+  } else {
+    summary_dt[, station_data_date := NA_character_]
+  }
+
+  # ---- Base GeoJSON: geometry + minimal station metadata ---------------------
+  base_dt = summary_dt[!is.na(lat) & !is.na(lon)]
+  base_features = vector("list", nrow(base_dt))
+  for (i in seq_len(nrow(base_dt))) {
+    row = base_dt[i]
+    props = list(id = row$id)
+    for (col in c("name", "state", "elev", "station_data_date")) {
+      val = row[[col]]
+      if (!is.na(val)) {
+        out_name = if (col == "station_data_date") "data_date" else col
+        props[[out_name]] = val
+      }
+    }
+    base_features[[i]] = list(
+      type = "Feature",
+      geometry = list(type = "Point",
+                      coordinates = c(round(row$lon, 4), round(row$lat, 4))),
+      properties = props
+    )
+  }
+  base_geojson = list(type = "FeatureCollection", features = base_features)
+  base_str = toJSON(base_geojson, auto_unbox = TRUE, digits = 4, na = "null")
+
+  base_path = file.path(paths$derived_dir, "stations_base.geojson.gz")
+  con = gzfile(base_path, "wb")
+  writeLines(base_str, con)
+  close(con)
+  base_mb = round(file.info(base_path)$size / 1e6, 2)
+  msg(sprintf("  Base GeoJSON: %d features, %.2f MB", nrow(base_dt), base_mb))
+
+  # ---- Identify slice columns by parsing column names ------------------------
+  KNOWN_VARS = c("spi", "spei", "eddi",
+                 "precip_mm", "precip_pon", "precip_dev", "precip_pctile")
+
+  parse_slice = function(col) {
+    for (v in KNOWN_VARS) {
+      prefix = paste0(v, "_")
+      if (startsWith(col, prefix)) {
+        rest = substr(col, nchar(prefix) + 1, nchar(col))
+        m = regmatches(rest, regexec("^(\\d+d|wy|ytd)_(.+)$", rest))[[1]]
+        if (length(m) == 3) {
+          return(list(var = v, ts = m[2], period = m[3], col = col))
+        }
+      }
+    }
+    NULL
+  }
+
+  candidate_cols = setdiff(names(summary_dt),
+                           c("id", "name", "lat", "lon", "elev", "state",
+                             "data_date", "station_data_date",
+                             obs_date_cols))
+  parsed_slices = Filter(Negate(is.null), lapply(candidate_cols, parse_slice))
+  msg(sprintf("  Found %d slice columns", length(parsed_slices)))
+
+  # ---- Write each slice to slices/<var>_<ts>_<period>.json.gz ----------------
+  # Sort station ids once for deterministic output across slices
+  ids_sorted = sort(summary_dt$id)
+  id_order = match(ids_sorted, summary_dt$id)
+
+  slice_manifest = vector("list", length(parsed_slices))
+  for (i in seq_along(parsed_slices)) {
+    s = parsed_slices[[i]]
+    vals = summary_dt[[s$col]][id_order]
+
+    # Round to 2 decimals; NA passes through (becomes null in JSON)
+    vals_rounded = ifelse(is.na(vals), NA_real_, round(vals, 2))
+
+    # Build sorted named list (keys = station ids)
+    values = setNames(as.list(vals_rounded), ids_sorted)
+
+    slice_obj = list(
+      var = s$var,
+      ts = s$ts,
+      period = s$period,
+      generated = generated,
+      values = values
+    )
+
+    filename = sprintf("%s_%s_%s.json.gz", s$var, s$ts, s$period)
+    slice_path = file.path(slices_dir, filename)
+
+    slice_str = toJSON(slice_obj, auto_unbox = TRUE, digits = 4, na = "null")
+    con = gzfile(slice_path, "wb")
+    writeLines(slice_str, con)
+    close(con)
+
+    n_valid = sum(!is.na(vals))
+
+    slice_manifest[[i]] = list(
+      var = s$var,
+      ts = s$ts,
+      period = s$period,
+      path = sprintf("slices/%s", filename),
+      n_valid = n_valid
+    )
+  }
+
+  # Sort manifest entries by var, ts, period for stable diffs
+  slice_order = order(
+    sapply(slice_manifest, function(x) x$var),
+    sapply(slice_manifest, function(x) x$ts),
+    sapply(slice_manifest, function(x) x$period)
+  )
+  slice_manifest = slice_manifest[slice_order]
+
+  # ---- Write manifest --------------------------------------------------------
+  manifest_obj = list(
+    generated = generated,
+    base = "stations_base.geojson.gz",
+    slices = slice_manifest
+  )
+  manifest_str = toJSON(manifest_obj, auto_unbox = TRUE, pretty = TRUE)
+  manifest_path = file.path(paths$derived_dir, "manifest.json.gz")
+  con = gzfile(manifest_path, "wb")
+  writeLines(manifest_str, con)
+  close(con)
+
+  # Spot-check: total slice file size
+  slice_files = list.files(slices_dir, pattern = "\\.json\\.gz$", full.names = TRUE)
+  total_slice_mb = round(sum(file.info(slice_files)$size) / 1e6, 2)
+  manifest_kb = round(file.info(manifest_path)$size / 1024, 1)
+  msg(sprintf("  Wrote %d slices (%.2f MB total), manifest %.1f KB",
+              length(slice_files), total_slice_mb, manifest_kb))
+}
+
 # ---- Generate station catalog ------------------------------------------------
 
 msg("Writing station catalog")

@@ -110,6 +110,56 @@ if [ -n "${AWS_BUCKET:-}" ]; then
     "s3://${AWS_BUCKET}/derived/ghcnd_drought/latest/" \
     --delete --no-progress
 
+  # ============================================================
+  # LAZY-LOAD LAYOUT — re-upload with proper headers
+  # The aws s3 sync above gets the bytes to S3, but does not set
+  # Content-Encoding or Cache-Control. Re-upload the lazy-load files
+  # individually with the correct metadata.
+  #
+  # Order: base → slices → manifest. The manifest is uploaded LAST so
+  # it never points at a slice that isn't there yet.
+  # ============================================================
+
+  CC="public, max-age=300"
+  S3_LATEST="s3://${AWS_BUCKET}/derived/ghcnd_drought/latest"
+
+  echo "=== $(date) — Re-uploading bundled GeoJSON with gzip headers ==="
+  if [ -f "$DATA_DIR/derived/ghcnd_drought/GHCNd_drought_current.geojson.gz" ]; then
+    aws s3 cp "$DATA_DIR/derived/ghcnd_drought/GHCNd_drought_current.geojson.gz" \
+      "${S3_LATEST}/GHCNd_drought_current.geojson.gz" \
+      --content-encoding gzip \
+      --content-type "application/geo+json" \
+      --cache-control "$CC" \
+      --no-progress
+  fi
+
+  echo "=== $(date) — Re-uploading base GeoJSON with gzip headers ==="
+  aws s3 cp "$DATA_DIR/derived/ghcnd_drought/stations_base.geojson.gz" \
+    "${S3_LATEST}/stations_base.geojson.gz" \
+    --content-encoding gzip \
+    --content-type "application/geo+json" \
+    --cache-control "$CC" \
+    --no-progress
+
+  echo "=== $(date) — Re-uploading slices with gzip headers ==="
+  for f in "$DATA_DIR/derived/ghcnd_drought/slices"/*.json.gz; do
+    [ -f "$f" ] || continue
+    base="$(basename "$f")"
+    aws s3 cp "$f" "${S3_LATEST}/slices/${base}" \
+      --content-encoding gzip \
+      --content-type "application/json" \
+      --cache-control "$CC" \
+      --no-progress
+  done
+
+  echo "=== $(date) — Uploading manifest (last, after slices) ==="
+  aws s3 cp "$DATA_DIR/derived/ghcnd_drought/manifest.json.gz" \
+    "${S3_LATEST}/manifest.json.gz" \
+    --content-encoding gzip \
+    --content-type "application/json" \
+    --cache-control "$CC" \
+    --no-progress
+
   echo "=== $(date) — S3 sync complete (date=${DATA_DATE}) ==="
 else
   echo "=== $(date) — AWS_BUCKET not set; skipping S3 sync (local run) ==="
